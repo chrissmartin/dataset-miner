@@ -42,6 +42,7 @@ output.json
 *.pdf
 logs/
 input
+output
 
 # Jupyter Notebook
 .ipynb_checkpoints

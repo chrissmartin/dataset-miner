@@ -1,13 +1,83 @@
 import json
 import logging
+import os
 import re
 from typing import List
-from langchain_community.llms import Ollama
+
 from langchain.schema import StrOutputParser
+from langchain_groq import ChatGroq
+from langchain_community.llms import Ollama
 from cost_analyzer import CostAnalyzer
 from prompt_templates import QA_GENERATION_TEMPLATE
+from rate_limiter import GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE, RateLimiter
 
 logger = logging.getLogger(__name__)
+
+
+def initialize_llm(args):
+    if args.use_groq:
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        if not groq_api_key:
+            logger.error(
+                "❌ GROQ_API_KEY not found in environment variables. Please set it in your .env file."
+            )
+            return None, None
+        llm = ChatGroq(model_name=args.model, groq_api_key=groq_api_key)
+        rate_limiter = RateLimiter(GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE)
+        logger.info("🚀 Using Groq with rate limiting")
+    else:
+        llm = Ollama(model=args.model)
+        rate_limiter = None
+        logger.info("🚀 Using Ollama")
+    return llm, rate_limiter
+
+
+def process_text(
+    text: str,
+    llm,
+    cost_analyzer: CostAnalyzer,
+    rate_limiter: RateLimiter = None,
+) -> List[dict]:
+    logger.debug(f"Processing text of length {len(text)}")
+    responses = generate_questions_answers(text, llm, cost_analyzer, rate_limiter)
+    logger.info(f"Generated {len(responses)} Q&A pairs")
+    return responses
+
+
+def generate_questions_answers(
+    text_chunk: str, llm, cost_analyzer: CostAnalyzer, rate_limiter: RateLimiter = None
+) -> List[dict]:
+    chain = QA_GENERATION_TEMPLATE | llm | StrOutputParser()
+    prompt_text = QA_GENERATION_TEMPLATE.format(text=text_chunk)
+    input_tokens = cost_analyzer.count_tokens(prompt_text)
+    logger.debug(
+        f"📤 Sending chunk of {len(text_chunk)} characters ({input_tokens} tokens) to LLM"
+    )
+
+    if rate_limiter:
+        rate_limiter.wait(input_tokens)
+
+    try:
+        response = chain.invoke({"text": text_chunk})
+        logger.debug(f"📥 Received response of {len(response)} characters from LLM")
+    except Exception as e:
+        logger.error(f"❌ Error generating Q&A pairs: {str(e)}")
+        return []
+
+    output_tokens = cost_analyzer.count_tokens(response)
+    input_cost, output_cost = cost_analyzer.add_usage(input_tokens, output_tokens)
+    total_cost = input_cost + output_cost
+    logger.info(
+        f"💰 Chunk processing cost: ${total_cost:.6f} (Input: ${input_cost:.6f}, Output: ${output_cost:.6f})"
+    )
+
+    result = extract_json_from_response(response)
+    if result:
+        logger.info(f"✅ Generated {len(result)} Q&A pairs from this chunk")
+        return result
+    else:
+        logger.error("❌ No valid JSON objects found in the response")
+        return []
 
 
 def extract_json_from_response(response: str) -> List[dict]:
@@ -25,56 +95,15 @@ def extract_json_from_response(response: str) -> List[dict]:
     return results
 
 
-def generate_questions_answers(
-    text_chunk: str, llm: Ollama, cost_analyzer: CostAnalyzer
-) -> List[dict]:
-    chain = QA_GENERATION_TEMPLATE | llm | StrOutputParser()
-    prompt_text = QA_GENERATION_TEMPLATE.format(text=text_chunk)
-    input_tokens = cost_analyzer.count_tokens(prompt_text)
-    logger.debug(f"Sending chunk of {len(text_chunk)} characters to Ollama")
-
-    try:
-        response = chain.invoke({"text": text_chunk})
-        logger.debug(f"Received response of {len(response)} characters from Ollama")
-        logger.debug(f"Raw LLM response: {response}")
-    except Exception as e:
-        logger.error(f"Error generating Q&A pairs: {str(e)}")
-        return []
-
-    output_tokens = cost_analyzer.count_tokens(response)
-    input_cost, output_cost = cost_analyzer.add_usage(input_tokens, output_tokens)
-    total_cost = input_cost + output_cost
-    logger.info(
-        f"Chunk processing cost: ${total_cost:.6f} (Input: ${input_cost:.6f}, Output: ${output_cost:.6f})"
-    )
-
-    result = extract_json_from_response(response)
-    if result:
-        logger.info(f"Generated {len(result)} Q&A pairs from this chunk")
-        return result
-    else:
-        logger.error("No valid JSON objects found in the response")
-        return []
-
-
-def process_text(
-    text: str, llm: Ollama, cost_analyzer: CostAnalyzer, chunk_size: int = 2000
-) -> List[dict]:
-    logger.debug(f"Processing text of length {len(text)}")
-    responses = generate_questions_answers(text, llm, cost_analyzer)
-    logger.info(f"Generated {len(responses)} Q&A pairs")
-    return responses
-
-
 def format_alpaca_dataset(qa_pairs: List[dict]) -> List[dict]:
     formatted_data = []
     for i, qa in enumerate(qa_pairs):
         try:
             formatted_data.append(
                 {
-                    "instruction": qa.get("instruction", ""),
-                    "input": qa.get("input", ""),
-                    "output": qa.get("output", ""),
+                    "instruction": str(qa.get("instruction", "")),
+                    "input": str(qa.get("input", "")),
+                    "output": str(qa.get("output", "")),
                 }
             )
         except Exception as e:
