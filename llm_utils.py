@@ -1,13 +1,59 @@
 import json
 import logging
 import re
+import time
 from typing import List
 from langchain_community.llms import Ollama
+from langchain_groq import ChatGroq
 from langchain.schema import StrOutputParser
 from cost_analyzer import CostAnalyzer
 from prompt_templates import QA_GENERATION_TEMPLATE
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting configuration for Groq
+GROQ_REQUESTS_PER_MINUTE = 29
+GROQ_TOKENS_PER_MINUTE = 14000
+
+
+class RateLimiter:
+    def __init__(self, requests_per_minute, tokens_per_minute):
+        self.requests_per_minute = requests_per_minute
+        self.tokens_per_minute = tokens_per_minute
+        self.request_timestamps = []
+        self.token_usage = []
+
+    def wait(self, tokens):
+        current_time = time.time()
+
+        # Remove timestamps older than 1 minute
+        self.request_timestamps = [
+            t for t in self.request_timestamps if current_time - t < 60
+        ]
+        self.token_usage = [t for t in self.token_usage if current_time - t[0] < 60]
+
+        # Check if we've exceeded the request limit
+        if len(self.request_timestamps) >= self.requests_per_minute:
+            sleep_time = 60 - (current_time - self.request_timestamps[0])
+            if sleep_time > 0:
+                logger.info(
+                    f"Rate limit reached. Sleeping for {sleep_time:.2f} seconds."
+                )
+                time.sleep(sleep_time)
+
+        # Check if we've exceeded the token limit
+        total_tokens = sum(t[1] for t in self.token_usage)
+        if total_tokens + tokens > self.tokens_per_minute:
+            sleep_time = 60 - (current_time - self.token_usage[0][0])
+            if sleep_time > 0:
+                logger.info(
+                    f"Token limit reached. Sleeping for {sleep_time:.2f} seconds."
+                )
+                time.sleep(sleep_time)
+
+        # Update timestamps and token usage
+        self.request_timestamps.append(time.time())
+        self.token_usage.append((time.time(), tokens))
 
 
 def extract_json_from_response(response: str) -> List[dict]:
@@ -26,16 +72,19 @@ def extract_json_from_response(response: str) -> List[dict]:
 
 
 def generate_questions_answers(
-    text_chunk: str, llm: Ollama, cost_analyzer: CostAnalyzer
+    text_chunk: str, llm, cost_analyzer: CostAnalyzer, rate_limiter: RateLimiter = None
 ) -> List[dict]:
     chain = QA_GENERATION_TEMPLATE | llm | StrOutputParser()
     prompt_text = QA_GENERATION_TEMPLATE.format(text=text_chunk)
     input_tokens = cost_analyzer.count_tokens(prompt_text)
-    logger.debug(f"Sending chunk of {len(text_chunk)} characters to Ollama")
+    logger.debug(f"Sending chunk of {len(text_chunk)} characters to LLM")
+
+    if rate_limiter:
+        rate_limiter.wait(input_tokens)
 
     try:
         response = chain.invoke({"text": text_chunk})
-        logger.debug(f"Received response of {len(response)} characters from Ollama")
+        logger.debug(f"Received response of {len(response)} characters from LLM")
         logger.debug(f"Raw LLM response: {response}")
     except Exception as e:
         logger.error(f"Error generating Q&A pairs: {str(e)}")
@@ -58,10 +107,13 @@ def generate_questions_answers(
 
 
 def process_text(
-    text: str, llm: Ollama, cost_analyzer: CostAnalyzer, chunk_size: int = 2000
+    text: str,
+    llm,
+    cost_analyzer: CostAnalyzer,
+    rate_limiter: RateLimiter = None,
 ) -> List[dict]:
     logger.debug(f"Processing text of length {len(text)}")
-    responses = generate_questions_answers(text, llm, cost_analyzer)
+    responses = generate_questions_answers(text, llm, cost_analyzer, rate_limiter)
     logger.info(f"Generated {len(responses)} Q&A pairs")
     return responses
 
@@ -72,9 +124,9 @@ def format_alpaca_dataset(qa_pairs: List[dict]) -> List[dict]:
         try:
             formatted_data.append(
                 {
-                    "instruction": qa.get("instruction", ""),
-                    "input": qa.get("input", ""),
-                    "output": qa.get("output", ""),
+                    "instruction": str(qa.get("instruction", "")),
+                    "input": str(qa.get("input", "")),
+                    "output": str(qa.get("output", "")),
                 }
             )
         except Exception as e:

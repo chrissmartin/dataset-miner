@@ -2,11 +2,22 @@ import argparse
 import json
 import os
 import logging
+from dotenv import load_dotenv
 from tqdm import tqdm
 from langchain_community.llms import Ollama
+from langchain_groq import ChatGroq
 from cost_analyzer import CostAnalyzer
 from data_extractor import extract_text
-from llm_utils import process_text, format_alpaca_dataset
+from llm_utils import (
+    process_text,
+    format_alpaca_dataset,
+    RateLimiter,
+    GROQ_REQUESTS_PER_MINUTE,
+    GROQ_TOKENS_PER_MINUTE,
+)
+
+# Load environment variables
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(
@@ -26,8 +37,14 @@ def save_mined_data(output_file):
     logger.info(f"Saved {len(formatted_data)} Q&A pairs to {output_file}")
 
 
-def process_file(file_path: str, llm: Ollama, cost_analyzer: CostAnalyzer) -> None:
-    text = extract_text(file_path)
+def process_file(
+    file_path: str,
+    llm,
+    cost_analyzer: CostAnalyzer,
+    rate_limiter: RateLimiter = None,
+    remove_empty: bool = False,
+) -> None:
+    text = extract_text(file_path, remove_empty)
     if text:
         global mined_data
         chunk_size = 2000
@@ -39,7 +56,7 @@ def process_file(file_path: str, llm: Ollama, cost_analyzer: CostAnalyzer) -> No
         for i, chunk in enumerate(
             tqdm(text_chunks, desc="Processing chunks", leave=False)
         ):
-            chunk_data = process_text(chunk, llm, cost_analyzer)
+            chunk_data = process_text(chunk, llm, cost_analyzer, rate_limiter)
             mined_data.extend(chunk_data)
             logger.info(
                 f"Chunk {i+1}/{len(text_chunks)} processed. Generated {len(chunk_data)} Q&A pairs."
@@ -66,6 +83,14 @@ def main():
         help="Output JSON file for the mined dataset (default: mined_dataset.json)",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "--use-groq", action="store_true", help="Use Groq instead of Ollama"
+    )
+    parser.add_argument(
+        "--remove-empty-columns",
+        action="store_true",
+        help="Remove empty columns from CSV and Excel files",
+    )
     args = parser.parse_args()
 
     if args.debug:
@@ -73,7 +98,22 @@ def main():
         logger.debug("Debug logging enabled")
 
     logger.info(f"Dataset Miner starting with model: {args.model}")
-    llm = Ollama(model=args.model)
+
+    if args.use_groq:
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        if not groq_api_key:
+            logger.error(
+                "GROQ_API_KEY not found in environment variables. Please set it in your .env file."
+            )
+            return
+        llm = ChatGroq(model_name=args.model, groq_api_key=groq_api_key)
+        rate_limiter = RateLimiter(GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE)
+        logger.info("Using Groq with rate limiting")
+    else:
+        llm = Ollama(model=args.model)
+        rate_limiter = None
+        logger.info("Using Ollama")
+
     cost_analyzer = CostAnalyzer(
         model_name="gpt-4o-mini",
         input_price_per_1m_tokens=0.150,
@@ -94,7 +134,13 @@ def main():
                 file_path = os.path.join(args.source, filename)
                 pbar.set_description(f"Processing {filename}")
                 logger.info(f"Mining data from {filename}...")
-                process_file(file_path, llm, cost_analyzer)
+                process_file(
+                    file_path,
+                    llm,
+                    cost_analyzer,
+                    rate_limiter,
+                    args.remove_empty_columns,
+                )
 
     except KeyboardInterrupt:
         logger.info("Interrupt received. Saving mined data and exiting...")
