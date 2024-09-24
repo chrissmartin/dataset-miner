@@ -46,6 +46,7 @@ def start_mining(args, llm, cost_analyzer, rate_limiter):
                 output_file=args.output,
                 chunk_size=2000,
                 chunk_overlap=200,
+                verify=args.verify,
             )
             mined_data.extend(file_mined_data)
             logger.info(
@@ -99,6 +100,7 @@ def process_file(
     output_file: str = "mined_dataset.json",
     chunk_size: int = 2000,
     chunk_overlap: int = 200,
+    verify: bool = False,
 ) -> List[Dict]:
     _, file_extension = os.path.splitext(file_path.lower())
 
@@ -128,13 +130,20 @@ def process_file(
         ):
             chunk_text = chunk.page_content if hasattr(chunk, "page_content") else chunk
             chunk_data = process_text(chunk_text, llm, cost_analyzer, rate_limiter)
-            verified_chunk_data = verify_dataset(
-                chunk_text, chunk_data, llm, cost_analyzer, rate_limiter
-            )
-            mined_data.extend(verified_chunk_data)
-            logger.info(
-                f"✅ Chunk {i+1}/{len(text_chunks)} processed. Generated {len(verified_chunk_data)} verified Q&A pairs."
-            )
+
+            if verify:
+                verified_chunk_data = verify_dataset(
+                    chunk_text, chunk_data, llm, cost_analyzer, rate_limiter
+                )
+                mined_data.extend(verified_chunk_data)
+                logger.info(
+                    f"✅ Chunk {i+1}/{len(text_chunks)} processed and verified. Generated {len(verified_chunk_data)} verified Q&A pairs."
+                )
+            else:
+                mined_data.extend(chunk_data)
+                logger.info(
+                    f"✅ Chunk {i+1}/{len(text_chunks)} processed. Generated {len(chunk_data)} Q&A pairs."
+                )
 
             save_mined_data(mined_data, output_file)
             logger.info(f"💾 Saved {len(mined_data)} Q&A pairs to {output_file}")

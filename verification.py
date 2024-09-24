@@ -38,12 +38,18 @@ def verify_qa_pair(
         logger.error(f"Error during verification: {str(e)}")
         return {"status": "ERROR", "explanation": str(e)}
 
+    # output_tokens = cost_analyzer.count_tokens(response)
+    # input_cost, output_cost = cost_analyzer.add_usage(input_tokens, output_tokens)
+    # total_cost = input_cost + output_cost
+    # logger.info(
+    #     f"💰 Verification cost: ${total_cost:.6f} (Input: ${input_cost:.6f}, Output: ${output_cost:.6f})"
+    # )
+
     output_tokens = cost_analyzer.count_tokens(response)
-    input_cost, output_cost = cost_analyzer.add_usage(input_tokens, output_tokens)
-    total_cost = input_cost + output_cost
-    logger.info(
-        f"💰 Verification cost: ${total_cost:.6f} (Input: ${input_cost:.6f}, Output: ${output_cost:.6f})"
+    verification_cost = cost_analyzer.add_verification_usage(
+        input_tokens, output_tokens
     )
+    logger.info(f"💰 Verification cost: ${verification_cost:.6f}")
 
     if response.startswith("CORRECT"):
         return {"status": "CORRECT", "explanation": response[7:].strip()}

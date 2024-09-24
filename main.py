@@ -37,6 +37,11 @@ def parse_arguments():
         action="store_true",
         help="Remove empty columns from CSV and Excel files",
     )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Enable verification of generated Q&A pairs",
+    )
     return parser.parse_args()
 
 
@@ -56,7 +61,7 @@ def print_summaryV1(mined_data, cost_analyzer, output_file):
         logger.info(f"Average cost per Q&A pair: ${average_cost_per_pair:.6f}")
 
 
-def print_summary(mined_data, cost_analyzer, output_file):
+def print_summary(mined_data, cost_analyzer, output_file, verification_enabled):
     summary = cost_analyzer.get_summary()
 
     print(f"\n{Fore.CYAN}{'=' * 60}")
@@ -81,6 +86,19 @@ def print_summary(mined_data, cost_analyzer, output_file):
         print(
             f"{Fore.BLUE}📌 Average cost per Q&A pair: {Fore.GREEN}${average_cost_per_pair:.6f}\n"
         )
+
+    if verification_enabled:
+        print(f"\n{Fore.YELLOW}🔍 Verification Statistics:")
+        print(
+            f"   🔢 Verification tokens: {Fore.CYAN}{summary['total_verification_tokens']:,}"
+        )
+        print(
+            f"   💰 Verification cost:   {Fore.GREEN}${summary['total_verification_cost']:,.6f}"
+        )
+    print(f"\n{Fore.YELLOW}💰 Grand Total Cost:")
+    print(
+        f"   💎 Total (incl. verification): {Fore.GREEN}${summary['grand_total_cost']:,.6f}\n"
+    )
 
     print(f"{Fore.CYAN}{'=' * 60}")
     print(
@@ -122,7 +140,7 @@ def main():
     except Exception as e:
         logger.error(f"❌ An error occurred during mining: {str(e)}")
     finally:
-        print_summary(mined_data, cost_analyzer, args.output)
+        print_summary(mined_data, cost_analyzer, args.output, args.verify)
 
 
 if __name__ == "__main__":
