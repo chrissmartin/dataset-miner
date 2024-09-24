@@ -82,16 +82,16 @@ def remove_empty_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def extract_text(file_path: str) -> str:
+def extract_text(file_path: str, remove_empty: bool = False) -> str:
     file_extension = file_path.lower().split(".")[-1]
     extraction_functions = {
         "pdf": extract_text_from_pdf,
         "txt": extract_text_from_txt,
         "docx": extract_text_from_docx,
         "json": extract_text_from_json,
-        "csv": extract_text_from_csv,
-        "xlsx": extract_text_from_xlsx,
-        "xls": extract_text_from_xlsx,
+        "csv": lambda fp: extract_text_from_csv(fp, remove_empty),
+        "xlsx": lambda fp: extract_text_from_xlsx(fp, remove_empty),
+        "xls": lambda fp: extract_text_from_xlsx(fp, remove_empty),
     }
     if file_extension in extraction_functions:
         return extraction_functions[file_extension](file_path)
