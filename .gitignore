@@ -38,10 +38,13 @@ Thumbs.db
 
 # Project-specific
 mined_dataset.json
-output.json
 *.pdf
 logs/
 input
+
+# Ignore output files and directories
+output
+output.json
 
 # Jupyter Notebook
 .ipynb_checkpoints
