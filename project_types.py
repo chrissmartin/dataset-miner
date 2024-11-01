@@ -20,4 +20,4 @@ if TYPE_CHECKING:
 ChatModel = Union["ChatGroq", "OllamaLLM"]
 
 
-__all__ = ["ChatModel"]
+__all__ = ["CliArgs", "ChatModel"]

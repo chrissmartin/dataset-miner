@@ -10,8 +10,9 @@ from langchain.text_splitter import (
 from langchain_community.document_loaders import UnstructuredHTMLLoader
 from cost_analyzer import CostAnalyzer
 from data_extractor import extract_text
-from llm_utils import process_text, format_alpaca_dataset, RateLimiter
+from llm_utils import process_text, format_alpaca_dataset
 from project_types import ChatModel
+from rate_limiter import RateLimiter
 from verification import verify_dataset
 import json
 import os
@@ -121,7 +122,7 @@ def process_file(
         text = data[0].page_content
         logger.info(f"📄 Loaded HTML content: {len(text)} characters")
     else:
-        text = extract_text(file_path, remove_empty)
+        text = extract_text(file_path)
         if not text:
             logger.warning(
                 f"⚠️ No text extracted from {file_path}. Skipping processing."
@@ -139,21 +140,23 @@ def process_file(
         for i, chunk in enumerate(
             tqdm(text_chunks, desc="🔍 Processing chunks", unit="chunk", leave=False)
         ):
-            chunk_text = chunk.page_content if hasattr(chunk, "page_content") else chunk
-            chunk_data = process_text(chunk_text, llm, cost_analyzer, rate_limiter)
+            chunk_context = (
+                chunk.page_content if hasattr(chunk, "page_content") else chunk
+            )
+            qa_pairs = process_text(chunk_context, llm, cost_analyzer, rate_limiter)
 
             if verify:
                 verified_chunk_data = verify_dataset(
-                    chunk_text, chunk_data, llm, cost_analyzer, rate_limiter
+                    chunk_context, qa_pairs, llm, cost_analyzer, rate_limiter
                 )
                 mined_data.extend(verified_chunk_data)
                 logger.info(
                     f"✅ Chunk {i+1}/{len(text_chunks)} processed and verified. Generated {len(verified_chunk_data)} verified Q&A pairs."
                 )
             else:
-                mined_data.extend(chunk_data)
+                mined_data.extend(qa_pairs)
                 logger.info(
-                    f"✅ Chunk {i+1}/{len(text_chunks)} processed. Generated {len(chunk_data)} Q&A pairs."
+                    f"✅ Chunk {i+1}/{len(text_chunks)} processed. Generated {len(qa_pairs)} Q&A pairs."
                 )
 
         # Save after each chunk

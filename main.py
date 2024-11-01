@@ -1,5 +1,6 @@
 import argparse
 import logging
+from typing import List
 from colorama import Fore, Style, init
 from dotenv import load_dotenv
 from cost_analyzer import CostAnalyzer
@@ -55,7 +56,12 @@ def parse_arguments() -> CliArgs:
     )
 
 
-def print_summary(mined_data, cost_analyzer, output_file, verification_enabled):
+def print_summary(
+    mined_data: List,
+    cost_analyzer: CostAnalyzer,
+    output_file_path: str,
+    verification_enabled: bool,
+):
     summary = cost_analyzer.get_summary()
 
     print(f"\n{Fore.CYAN}{'=' * 60}")
@@ -63,7 +69,9 @@ def print_summary(mined_data, cost_analyzer, output_file, verification_enabled):
     print(f"{Fore.CYAN}{'=' * 60}\n")
 
     print(f"{Fore.GREEN}✨ Dataset mining complete!")
-    print(f"   📁 {len(mined_data)} Q&A pairs extracted and saved to {output_file}\n")
+    print(
+        f"   📁 {len(mined_data)} Q&A pairs extracted and saved to {output_file_path}\n"
+    )
 
     print(f"{Fore.MAGENTA}🔢 Token Statistics:")
     print(f"   📥 Input tokens:  {Fore.CYAN}{summary['total_input_tokens']:,}")
@@ -108,6 +116,7 @@ def main():
     args: CliArgs = parse_arguments()
     setup_logging(args.debug)
     mined_data = []
+    output_file_path = ""
 
     if args.debug:
         logger.debug("🐞 Debug logging enabled")
@@ -126,6 +135,10 @@ def main():
     )
     logger.info("💰 Cost analyzer initialized")
 
+    if not llm:
+        logger.error("❌ Failed to initialize LLM. Exiting...")
+        return
+
     try:
         logger.info("🏁 Starting mining process...")
         mined_data, output_file_path = start_mining(
@@ -136,6 +149,7 @@ def main():
         logger.warning("⚠️ Interrupt received. Saving mined data and exiting...")
     except Exception as e:
         logger.error(f"❌ An error occurred during mining: {str(e)}")
+        logger.error(e)
     finally:
         print_summary(mined_data, cost_analyzer, output_file_path, args.verify)
 

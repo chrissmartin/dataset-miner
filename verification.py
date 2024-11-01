@@ -15,23 +15,26 @@ def verify_qa_pair(
     cost_analyzer: CostAnalyzer,
     rate_limiter=None,
 ) -> Dict[str, str]:
-    chain = VERIFICATION_TEMPLATE | llm | StrOutputParser()
+    question = qa_pair["instruction"]
+    answer = qa_pair["output"]
 
-    prompt_text = VERIFICATION_TEMPLATE.format(
-        context=context, question=qa_pair["instruction"], answer=qa_pair["output"]
+    # Input Token Count
+    prompt_text_for_count = VERIFICATION_TEMPLATE.format(
+        context=context, question=question, answer=answer
     )
-
-    input_tokens = cost_analyzer.count_tokens(prompt_text)
+    input_tokens = cost_analyzer.count_tokens(prompt_text_for_count)
 
     if rate_limiter:
         rate_limiter.wait(input_tokens)
 
     try:
+        logger.debug(f"Verifying Q&A pair: {qa_pair}")
+        chain = VERIFICATION_TEMPLATE | llm | StrOutputParser()
         response = chain.invoke(
             {
                 "context": context,
-                "question": qa_pair["instruction"],
-                "answer": qa_pair["output"],
+                "question": question,
+                "answer": answer,
             }
         )
         logger.debug(f"Verification response: {response}")
@@ -39,7 +42,9 @@ def verify_qa_pair(
         logger.error(f"Error during verification: {str(e)}")
         return {"status": "ERROR", "explanation": str(e)}
 
+    # Output Token Count
     output_tokens = cost_analyzer.count_tokens(response)
+    # Token Cost Analysis
     verification_cost = cost_analyzer.add_verification_usage(
         input_tokens, output_tokens
     )
