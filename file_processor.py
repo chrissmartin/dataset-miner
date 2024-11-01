@@ -166,7 +166,7 @@ def process_file(
 
 
 def generate_unique_filename(base_filename: str) -> str:
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     directory, filename = os.path.split(base_filename)
     name, ext = os.path.splitext(filename)
     return os.path.join(directory, f"{name}_{timestamp}{ext}")

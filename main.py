@@ -144,7 +144,6 @@ def main():
         logger.warning("⚠️ Interrupt received. Saving mined data and exiting...")
     except Exception as e:
         logger.error(f"❌ An error occurred during mining: {str(e)}")
-        logger.error(e)
     finally:
         print_summary(mined_data, cost_analyzer, output_file_path, args.verify)
 
