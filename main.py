@@ -121,25 +121,20 @@ def main():
     if args.debug:
         logger.debug("🐞 Debug logging enabled")
 
-    logger.info(f"🚀 Dataset Miner starting with model: {args.model}")
-
-    llm, rate_limiter = initialize_llm(args)
-    if not llm:
-        logger.error("❌ Failed to initialize LLM. Exiting...")
-        return
-
-    cost_analyzer = CostAnalyzer(
-        model_name="gpt-4o-mini",
-        input_price_per_1m_tokens=0.150,
-        output_price_per_1m_tokens=0.600,
-    )
-    logger.info("💰 Cost analyzer initialized")
-
-    if not llm:
-        logger.error("❌ Failed to initialize LLM. Exiting...")
-        return
-
     try:
+        logger.info(f"🚀 Dataset Miner starting with model: {args.model}")
+        llm, rate_limiter = initialize_llm(args)
+        if not llm:
+            logger.error("❌ Failed to initialize LLM. Exiting...")
+            return
+
+        logger.info("💰 Initializing cost analyzer")
+        cost_analyzer = CostAnalyzer(
+            model_name="gpt-4o-mini",
+            input_price_per_1m_tokens=0.150,
+            output_price_per_1m_tokens=0.600,
+        )
+        logger.info("💰 Cost analyzer initialized")
         logger.info("🏁 Starting mining process...")
         mined_data, output_file_path = start_mining(
             args, llm, cost_analyzer, rate_limiter

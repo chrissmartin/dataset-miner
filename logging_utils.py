@@ -6,27 +6,17 @@ init(autoreset=True)
 
 
 class ColorfulFormatter(logging.Formatter):
+    BASE_FORMAT = "%(asctime)s - %(levelname)s - %(message)s" + Style.RESET_ALL
     FORMATS = {
-        logging.DEBUG: Fore.CYAN
-        + "%(asctime)s - %(levelname)s - %(message)s"
-        + Style.RESET_ALL,
-        logging.INFO: Fore.GREEN
-        + "%(asctime)s - %(levelname)s - %(message)s"
-        + Style.RESET_ALL,
-        logging.WARNING: Fore.YELLOW
-        + "%(asctime)s - %(levelname)s - %(message)s"
-        + Style.RESET_ALL,
-        logging.ERROR: Fore.RED
-        + "%(asctime)s - %(levelname)s - %(message)s"
-        + Style.RESET_ALL,
-        logging.CRITICAL: Back.RED
-        + Fore.WHITE
-        + "%(asctime)s - %(levelname)s - %(message)s"
-        + Style.RESET_ALL,
+        logging.DEBUG: Fore.CYAN + BASE_FORMAT,
+        logging.INFO: Fore.GREEN + BASE_FORMAT,
+        logging.WARNING: Fore.YELLOW + BASE_FORMAT,
+        logging.ERROR: Fore.RED + BASE_FORMAT,
+        logging.CRITICAL: Back.RED + Fore.WHITE + BASE_FORMAT,
     }
 
     def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
+        log_fmt = self.FORMATS.get(record.levelno, self.BASE_FORMAT)
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
         return formatter.format(record)
 
