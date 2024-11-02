@@ -1,13 +1,13 @@
 import argparse
 import logging
-from typing import List
-from colorama import Fore, Style, init
+from colorama import init
 from dotenv import load_dotenv
 from cost_analyzer import CostAnalyzer
 from file_processor import start_mining
 from llm_utils import initialize_llm
 from logging_utils import setup_logging
 from project_types import CliArgs
+from summary_log import print_summary
 
 # Load environment variables
 load_dotenv()
@@ -54,61 +54,6 @@ def parse_arguments() -> CliArgs:
         remove_empty_columns=args.remove_empty_columns,
         verify=args.verify,
     )
-
-
-def print_summary(
-    mined_data: List,
-    cost_analyzer: CostAnalyzer,
-    output_file_path: str,
-    verification_enabled: bool,
-):
-    summary = cost_analyzer.get_summary()
-
-    print(f"\n{Fore.CYAN}{'=' * 60}")
-    print(f"{Fore.YELLOW}{Style.BRIGHT}📊 Dataset Mining Summary 📊".center(60))
-    print(f"{Fore.CYAN}{'=' * 60}\n")
-
-    print(f"{Fore.GREEN}✨ Dataset mining complete!")
-    print(
-        f"   📁 {len(mined_data)} Q&A pairs extracted and saved to {output_file_path}\n"
-    )
-
-    print(f"{Fore.MAGENTA}🔢 Token Statistics:")
-    print(f"   📥 Input tokens:  {Fore.CYAN}{summary['total_input_tokens']:,}")
-    print(f"   📤 Output tokens: {Fore.CYAN}{summary['total_output_tokens']:,}")
-    print(f"   🔢 Total tokens:  {Fore.CYAN}{summary['total_tokens']:,}\n")
-
-    print(f"{Fore.YELLOW}💰 Cost Breakdown:")
-    print(f"   📥 Input cost:  {Fore.GREEN}${summary['total_input_cost']:,.6f}")
-    print(f"   📤 Output cost: {Fore.GREEN}${summary['total_output_cost']:,.6f}")
-    print(f"   💎 Total cost:  {Fore.GREEN}${summary['total_cost']:,.6f}\n")
-
-    if len(mined_data) > 0:
-        average_cost_per_pair = summary["total_cost"] / len(mined_data)
-        print(
-            f"{Fore.BLUE}📌 Average cost per Q&A pair: {Fore.GREEN}${average_cost_per_pair:.6f}\n"
-        )
-
-    if verification_enabled:
-        print(f"\n{Fore.YELLOW}🔍 Verification Statistics:")
-        print(
-            f"   🔢 Verification tokens: {Fore.CYAN}{summary['total_verification_tokens']:,}"
-        )
-        print(
-            f"   💰 Verification cost:   {Fore.GREEN}${summary['total_verification_cost']:,.6f}"
-        )
-    print(f"\n{Fore.YELLOW}💰 Grand Total Cost:")
-    print(
-        f"   💎 Total (incl. verification): {Fore.GREEN}${summary['grand_total_cost']:,.6f}\n"
-    )
-
-    print(f"{Fore.CYAN}{'=' * 60}")
-    print(
-        f"{Fore.YELLOW}{Style.BRIGHT}🎉 Mining Process Completed Successfully! 🎉".center(
-            60
-        )
-    )
-    print(f"{Fore.CYAN}{'=' * 60}\n")
 
 
 def main():
