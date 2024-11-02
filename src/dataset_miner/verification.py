@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict
+from typing import List, TypedDict
 from langchain.schema import StrOutputParser
 from dataset_miner.cost_analyzer import CostAnalyzer
 from dataset_miner.project_types import ChatModel
@@ -8,13 +8,28 @@ from dataset_miner.prompt_templates import VERIFICATION_TEMPLATE
 logger = logging.getLogger(__name__)
 
 
+class VerificationResult(TypedDict):
+    status: str
+    explanation: str
+
+
+class QAPair(TypedDict):
+    instruction: str
+    input: str
+    output: str
+
+
+class VerifiedQAPair(QAPair):
+    verification: VerificationResult
+
+
 def verify_qa_pair(
     context: str,
-    qa_pair: Dict[str, str],
+    qa_pair: QAPair,
     llm: ChatModel,
     cost_analyzer: CostAnalyzer,
     rate_limiter=None,
-) -> Dict[str, str]:
+) -> VerificationResult:
     question = qa_pair["instruction"]
     answer = qa_pair["output"]
 
@@ -40,7 +55,7 @@ def verify_qa_pair(
         logger.debug(f"Verification response: {response}")
     except Exception as e:
         logger.error(f"Error during verification: {str(e)}")
-        return {"status": "ERROR", "explanation": str(e)}
+        return VerificationResult(status="ERROR", explanation=str(e))
 
     # Output Token Count
     output_tokens = cost_analyzer.count_tokens(response)
@@ -51,28 +66,30 @@ def verify_qa_pair(
     logger.info(f"💰 Verification cost: ${verification_cost:.6f}")
 
     if response.strip().upper().startswith("CORRECT"):
-        return {"status": "CORRECT", "explanation": response[7:].strip()}
+        return VerificationResult(status="CORRECT", explanation=response[7:].strip())
     elif response.strip().upper().startswith("INCORRECT"):
-        return {"status": "INCORRECT", "explanation": response[9:].strip()}
+        return VerificationResult(status="INCORRECT", explanation=response[9:].strip())
     else:
-        return {"status": "UNKNOWN", "explanation": "Unexpected verification response"}
+        return VerificationResult(
+            status="UNKNOWN", explanation="Unexpected verification response"
+        )
 
 
 def verify_dataset(
     context: str,
-    qa_pairs: List[Dict[str, str]],
+    qa_pairs: List[QAPair],
     llm: ChatModel,
     cost_analyzer: CostAnalyzer,
     rate_limiter=None,
-) -> List[Dict[str, str]]:
-    verified_dataset: List[Dict[str, str]] = []
+) -> List[VerifiedQAPair]:
+    verified_dataset: List[VerifiedQAPair] = []
     for qa_pair in qa_pairs:
-        verification_result: Dict[str, str] = verify_qa_pair(
+        verification_result: VerificationResult = verify_qa_pair(
             context, qa_pair, llm, cost_analyzer, rate_limiter
         )
-        verified_pair: Dict[str, str] = {
+        verified_pair: VerifiedQAPair = {
             **qa_pair,
-            "verification": str(verification_result),
+            "verification": verification_result,
         }
         verified_dataset.append(verified_pair)
     return verified_dataset

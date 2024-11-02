@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 from tqdm import tqdm
 from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
@@ -18,9 +18,9 @@ from dataset_miner.file_types import (
     is_supported_code_file,
 )
 from dataset_miner.llm_utils import process_text, format_alpaca_dataset
-from dataset_miner.project_types import ChatModel
+from dataset_miner.project_types import ChatModel, CliArgs
 from dataset_miner.rate_limiter import RateLimiter
-from dataset_miner.verification import verify_dataset
+from dataset_miner.verification import verify_dataset, QAPair, VerifiedQAPair
 
 import json
 import os
@@ -29,12 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 def start_mining(
-    args,
+    args: CliArgs,
     llm: ChatModel,
     cost_analyzer: CostAnalyzer,
     rate_limiter: Optional[RateLimiter] = None,
-):
-    mined_data = []
+) -> Tuple[List[Union[QAPair, VerifiedQAPair]], str]:
+    mined_data: List[Union[QAPair, VerifiedQAPair]] = []
     files = get_file_list(args.source)
 
     # Generate a unique output filename at the start
@@ -116,7 +116,7 @@ def process_file(
     chunk_size: int = 2000,
     chunk_overlap: int = 200,
     verify: bool = False,
-) -> List[Dict]:
+) -> List[Union[QAPair, VerifiedQAPair]]:
     _, file_extension = os.path.splitext(file_path.lower())
 
     logger.info(f"🔧 Processing file: {file_path}")
@@ -134,7 +134,7 @@ def process_file(
             return []
         logger.info(f"📄 Extracted text: {len(text)} characters")
 
-    mined_data = []
+    mined_data: List[Union[QAPair, VerifiedQAPair]] = []
     if text:
         text_splitter = get_appropriate_splitter(file_path, chunk_size, chunk_overlap)
         text_chunks = text_splitter.split_text(text)
@@ -147,10 +147,12 @@ def process_file(
             chunk_context = (
                 chunk.page_content if hasattr(chunk, "page_content") else chunk
             )
-            qa_pairs = process_text(chunk_context, llm, cost_analyzer, rate_limiter)
+            qa_pairs: List[QAPair] = process_text(
+                chunk_context, llm, cost_analyzer, rate_limiter
+            )
 
             if verify:
-                verified_chunk_data = verify_dataset(
+                verified_chunk_data: List[VerifiedQAPair] = verify_dataset(
                     chunk_context, qa_pairs, llm, cost_analyzer, rate_limiter
                 )
                 mined_data.extend(verified_chunk_data)
@@ -176,11 +178,15 @@ def generate_unique_filename(base_filename: str) -> str:
     return os.path.join(directory, f"{name}_{timestamp}{ext}")
 
 
-def save_mined_data(mined_data: List[Dict], output_file_path: str):
-    formatted_data = format_alpaca_dataset(mined_data)
+def save_mined_data(
+    mined_data: List[Union[QAPair, VerifiedQAPair]], output_file_path: str
+) -> None:
+    # Convert Union type to Dict before passing to format_alpaca_dataset
+    data_as_dicts: List[Dict[str, Any]] = [dict(qa_pair) for qa_pair in mined_data]
+    formatted_data = format_alpaca_dataset(data_as_dicts)
 
     # Create the directory if it doesn't exist
-    os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+    os.makedirs(os.path.dirname(output_file_path) or ".", exist_ok=True)
 
     # Check if the file exists and has content
     if os.path.exists(output_file_path) and os.path.getsize(output_file_path) > 0:

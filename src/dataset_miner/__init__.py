@@ -8,14 +8,13 @@ This package provides functionality to:
 """
 
 from importlib.metadata import version, PackageNotFoundError
-from typing import Dict, List
 
 # Core functionality imports
 from dataset_miner.file_processor import start_mining
 from dataset_miner.llm_utils import initialize_llm, process_text
 from dataset_miner.cost_analyzer import CostAnalyzer
 from dataset_miner.data_extractor import extract_text
-from dataset_miner.verification import verify_dataset
+from dataset_miner.verification import QAPair, VerifiedQAPair, verify_dataset
 from dataset_miner.project_types import CliArgs, ChatModel
 
 # Try to get the version from package metadata
@@ -51,7 +50,7 @@ def mine_documents(
     remove_empty_columns: bool = False,
     verify: bool = False,
     debug: bool = False,
-) -> tuple[List[Dict], str]:
+) -> tuple[list[QAPair | VerifiedQAPair], str]:
     """
     High-level function to mine documents from a directory using specified AI model.
 

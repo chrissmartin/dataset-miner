@@ -10,6 +10,7 @@ from dataset_miner.logging_utils import setup_logging
 from dataset_miner.project_types import CliArgs
 from dataset_miner.summary_log import print_summary
 from dataset_miner import __version__
+from dataset_miner.verification import QAPair, VerifiedQAPair
 
 # Load environment variables
 load_dotenv()
@@ -64,7 +65,7 @@ def main() -> None:
     init(autoreset=True)
     args: CliArgs = parse_arguments()
     setup_logging(args.debug)
-    mined_data = []
+    mined_data: list[QAPair | VerifiedQAPair] = []
     output_file_path = ""
 
     if args.debug:
