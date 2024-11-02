@@ -2,28 +2,34 @@ import json
 import logging
 import os
 import re
-from typing import List
+from typing import List, Optional
 from langchain.schema import StrOutputParser
 from langchain_groq import ChatGroq
 from langchain_ollama import OllamaLLM
-from cost_analyzer import CostAnalyzer
-from project_types import ChatModel, CliArgs
-from prompt_templates import QA_GENERATION_TEMPLATE
-from rate_limiter import GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE, RateLimiter
+from pydantic import SecretStr
+
+from dataset_miner.cost_analyzer import CostAnalyzer
+from dataset_miner.project_types import ChatModel, CliArgs
+from dataset_miner.prompt_templates import QA_GENERATION_TEMPLATE
+from dataset_miner.rate_limiter import (
+    GROQ_REQUESTS_PER_MINUTE,
+    GROQ_TOKENS_PER_MINUTE,
+    RateLimiter,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def initialize_llm(args: CliArgs):
-    llm: ChatModel = None
+    llm: Optional[ChatModel] = None
     if args.use_groq:
-        groq_api_key = os.getenv("GROQ_API_KEY")
+        groq_api_key: Optional[SecretStr] = SecretStr(os.getenv("GROQ_API_KEY")) if os.getenv("GROQ_API_KEY") else None
         if not groq_api_key:
             logger.error(
                 "❌ GROQ_API_KEY not found in environment variables. Please set it in your .env file."
             )
             return None, None
-        llm = ChatGroq(model_name=args.model, groq_api_key=groq_api_key)
+        llm = ChatGroq(model=args.model, api_key=groq_api_key)
         rate_limiter = RateLimiter(GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE)
         logger.info("🚀 Using Groq with rate limiting")
     else:
@@ -52,7 +58,7 @@ def generate_questions_answers(
     text_chunk: str,
     llm: ChatModel,
     cost_analyzer: CostAnalyzer,
-    rate_limiter: RateLimiter = None,
+    rate_limiter: Optional[RateLimiter] = None,
 ) -> List[dict]:
     # Input Token Count
     prompt_text_for_count = QA_GENERATION_TEMPLATE.format(text=text_chunk)
@@ -93,7 +99,7 @@ def process_text(
     text: str,
     llm: ChatModel,
     cost_analyzer: CostAnalyzer,
-    rate_limiter: RateLimiter = None,
+    rate_limiter: Optional[RateLimiter] = None,
 ) -> List[dict]:
     logger.debug(f"Processing text of length {len(text)}")
     responses = generate_questions_answers(text, llm, cost_analyzer, rate_limiter)

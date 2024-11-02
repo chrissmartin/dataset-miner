@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 from tqdm import tqdm
 from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
@@ -8,30 +8,31 @@ from langchain.text_splitter import (
     HTMLHeaderTextSplitter,
 )
 from langchain_community.document_loaders import UnstructuredHTMLLoader
-from cost_analyzer import CostAnalyzer
-from data_extractor import extract_text
-from llm_utils import process_text, format_alpaca_dataset
-from project_types import ChatModel
-from rate_limiter import RateLimiter
-from verification import verify_dataset
+
+from dataset_miner.cost_analyzer import CostAnalyzer
+from dataset_miner.data_extractor import extract_text
+from dataset_miner.file_types import (
+    EXTENSION_TO_LANGUAGE,
+    get_file_extension,
+    get_file_list,
+    is_supported_code_file,
+)
+from dataset_miner.llm_utils import process_text, format_alpaca_dataset
+from dataset_miner.project_types import ChatModel
+from dataset_miner.rate_limiter import RateLimiter
+from dataset_miner.verification import verify_dataset
+
 import json
 import os
 
 logger = logging.getLogger(__name__)
 
 
-def get_file_list(source_dir):
-    return [
-        f
-        for f in os.listdir(source_dir)
-        if f.lower().endswith(
-            (".pdf", ".txt", ".docx", ".json", ".csv", ".xlsx", ".xls", ".html", ".md")
-        )
-    ]
-
-
 def start_mining(
-    args, llm: ChatModel, cost_analyzer: CostAnalyzer, rate_limiter: RateLimiter = None
+    args,
+    llm: ChatModel,
+    cost_analyzer: CostAnalyzer,
+    rate_limiter: Optional[RateLimiter] = None,
 ):
     mined_data = []
     files = get_file_list(args.source)
@@ -50,7 +51,6 @@ def start_mining(
                 llm,
                 cost_analyzer,
                 rate_limiter,
-                remove_empty=args.remove_empty_columns,
                 output_file=unique_output_file,
                 chunk_size=2000,
                 chunk_overlap=200,
@@ -68,13 +68,18 @@ def start_mining(
 
 
 def get_appropriate_splitter(file_path: str, chunk_size: int, chunk_overlap: int):
-    _, file_extension = os.path.splitext(file_path.lower())
+    file_extension = get_file_extension(file_path)
 
     if file_extension == ".html":
         return HTMLHeaderTextSplitter(
-            tags=["h1", "h2", "h3", "h4", "h5", "h6"],
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
+            headers_to_split_on=[
+                ("h1", "Header 1"),
+                ("h2", "Header 2"),
+                ("h3", "Header 3"),
+                ("h4", "Header 4"),
+                ("h5", "Header 5"),
+                ("h6", "Header 6"),
+            ],
         )
     elif file_extension == ".md":
         return MarkdownHeaderTextSplitter(
@@ -84,9 +89,9 @@ def get_appropriate_splitter(file_path: str, chunk_size: int, chunk_overlap: int
                 ("###", "Header 3"),
             ]
         )
-    elif file_extension in [".py", ".java", ".cpp", ".js", ".ts", ".c", ".go", ".rb"]:
+    elif is_supported_code_file(file_extension):
         return RecursiveCharacterTextSplitter.from_language(
-            language=file_extension[1:],
+            language=EXTENSION_TO_LANGUAGE[file_extension],
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
         )
@@ -106,8 +111,7 @@ def process_file(
     file_path: str,
     llm: ChatModel,
     cost_analyzer: CostAnalyzer,
-    rate_limiter: RateLimiter = None,
-    remove_empty: bool = False,
+    rate_limiter: Optional[RateLimiter] = None,
     output_file: str = "mined_dataset.json",
     chunk_size: int = 2000,
     chunk_overlap: int = 200,

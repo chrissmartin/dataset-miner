@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "src/dataset_miner/_version.py"
+
+[project]
+name = "dataset-miner"
+dynamic = ["version"]
+description = "A CLI tool for generating Q&A datasets from various document formats using AI models"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+keywords = ["dataset", "mining", "AI", "NLP", "Q&A"]
+authors = [{ name = "Chriss Martin", email = "thechrissmartin@gmail.com" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "langchain>=0.3.6",
+    "langchain-community>=0.3.4",
+    "langchain-groq>=0.2.0",
+    "langchain-ollama>=0.2.0",
+    "PyPDF2>=3.0.1",
+    "tqdm>=4.66.5",
+    "python-docx>=1.1.2",
+    "pandas>=2.2.3",
+    "openpyxl>=3.1.5",
+    "tiktoken>=0.8.0",
+    "python-dotenv>=1.0.1",
+    "colorama>=0.4.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/chrissmartin/dataset-miner"
+Repository = "https://github.com/chrissmartin/dataset-miner.git"
+"Bug Tracker" = "https://github.com/chrissmartin/dataset-miner/issues"
+
+[project.scripts]
+dataset-miner = "dataset_miner.cli:main"

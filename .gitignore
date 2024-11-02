@@ -1,4 +1,4 @@
-# Python-specific
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -19,50 +19,26 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual environments
+# Virtual Environment
 venv/
 env/
 ENV/
+.env
 
-# IDEs and editors
-.vscode/
+# IDE
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
 
-# OS-specific
-.DS_Store
-Thumbs.db
+# Project specific
+mined_dataset*.json
+*.log
+input/*
+output/*
 
-# Project-specific
-mined_dataset.json
-*.pdf
-logs/
-input
-
-# Ignore output files and directories
-output
-output.json
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# dotenv environment variables file
-.env
-
-# mypy
-.mypy_cache/
-
-# pytest
-.pytest_cache/
-
-# Coverage reports
-htmlcov/
-.coverage
-.coverage.*
-*.cover
+# Package version
+src/dataset_miner/_version.py

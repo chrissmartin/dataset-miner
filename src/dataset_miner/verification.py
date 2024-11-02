@@ -1,9 +1,9 @@
 import logging
 from typing import List, Dict
 from langchain.schema import StrOutputParser
-from cost_analyzer import CostAnalyzer
-from project_types import ChatModel
-from prompt_templates import VERIFICATION_TEMPLATE
+from dataset_miner.cost_analyzer import CostAnalyzer
+from dataset_miner.project_types import ChatModel
+from dataset_miner.prompt_templates import VERIFICATION_TEMPLATE
 
 logger = logging.getLogger(__name__)
 
@@ -65,11 +65,14 @@ def verify_dataset(
     cost_analyzer: CostAnalyzer,
     rate_limiter=None,
 ) -> List[Dict[str, str]]:
-    verified_dataset = []
+    verified_dataset: List[Dict[str, str]] = []
     for qa_pair in qa_pairs:
-        verification_result = verify_qa_pair(
+        verification_result: Dict[str, str] = verify_qa_pair(
             context, qa_pair, llm, cost_analyzer, rate_limiter
         )
-        verified_pair = {**qa_pair, "verification": verification_result}
+        verified_pair: Dict[str, str] = {
+            **qa_pair,
+            "verification": str(verification_result),
+        }
         verified_dataset.append(verified_pair)
     return verified_dataset
