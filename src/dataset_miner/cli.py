@@ -2,12 +2,15 @@ import argparse
 import logging
 from colorama import init
 from dotenv import load_dotenv
-from cost_analyzer import CostAnalyzer
-from file_processor import start_mining
-from llm_utils import initialize_llm
-from logging_utils import setup_logging
-from project_types import CliArgs
-from summary_log import print_summary
+
+from dataset_miner.cost_analyzer import CostAnalyzer
+from dataset_miner.file_processor import start_mining
+from dataset_miner.llm_utils import initialize_llm
+from dataset_miner.logging_utils import setup_logging
+from dataset_miner.project_types import CliArgs
+from dataset_miner.summary_log import print_summary
+from dataset_miner import __version__
+from dataset_miner.verification import QAPair, VerifiedQAPair
 
 # Load environment variables
 load_dotenv()
@@ -56,11 +59,13 @@ def parse_arguments() -> CliArgs:
     )
 
 
-def main():
+def main() -> None:
+    """Main entry point for the dataset-miner CLI."""
+    print(f"Dataset Miner version: {__version__}")
     init(autoreset=True)
     args: CliArgs = parse_arguments()
     setup_logging(args.debug)
-    mined_data = []
+    mined_data: list[QAPair | VerifiedQAPair] = []
     output_file_path = ""
 
     if args.debug:

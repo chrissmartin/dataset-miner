@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from colorama import Fore, Style
 
-from cost_analyzer import CostAnalyzer
+from dataset_miner.cost_analyzer import CostAnalyzer
 
 SEPARATOR_LENGTH = 60
 

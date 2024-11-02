@@ -2,28 +2,37 @@ import json
 import logging
 import os
 import re
-from typing import List
+from typing import Any, Dict, List, Optional, cast
 from langchain.schema import StrOutputParser
 from langchain_groq import ChatGroq
 from langchain_ollama import OllamaLLM
-from cost_analyzer import CostAnalyzer
-from project_types import ChatModel, CliArgs
-from prompt_templates import QA_GENERATION_TEMPLATE
-from rate_limiter import GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE, RateLimiter
+from pydantic import SecretStr
+
+from dataset_miner.cost_analyzer import CostAnalyzer
+from dataset_miner.project_types import ChatModel, CliArgs
+from dataset_miner.prompt_templates import QA_GENERATION_TEMPLATE
+from dataset_miner.rate_limiter import (
+    GROQ_REQUESTS_PER_MINUTE,
+    GROQ_TOKENS_PER_MINUTE,
+    RateLimiter,
+)
+from dataset_miner.verification import QAPair
 
 logger = logging.getLogger(__name__)
 
 
 def initialize_llm(args: CliArgs):
-    llm: ChatModel = None
+    llm: Optional[ChatModel] = None
     if args.use_groq:
-        groq_api_key = os.getenv("GROQ_API_KEY")
-        if not groq_api_key:
+        groq_api_key_value = os.getenv("GROQ_API_KEY")
+        if groq_api_key_value is not None:
+            groq_api_key = SecretStr(groq_api_key_value)
+        else:
             logger.error(
                 "❌ GROQ_API_KEY not found in environment variables. Please set it in your .env file."
             )
             return None, None
-        llm = ChatGroq(model_name=args.model, groq_api_key=groq_api_key)
+        llm = ChatGroq(model=args.model, api_key=groq_api_key, stop_sequences=None)
         rate_limiter = RateLimiter(GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE)
         logger.info("🚀 Using Groq with rate limiting")
     else:
@@ -33,16 +42,18 @@ def initialize_llm(args: CliArgs):
     return llm, rate_limiter
 
 
-def extract_json_from_response(response: str) -> List[dict]:
+def extract_json_from_response(response: str) -> List[QAPair]:
     json_matches = re.findall(r"\[[\s\S]*\]", response, re.DOTALL)
-    results = []
+    results: List[QAPair] = []
     for json_str in json_matches:
         try:
             json_obj = json.loads(json_str)
             if isinstance(json_obj, list):
-                results.extend(json_obj)
+                # Cast each dictionary to QAPair type
+                results.extend(cast(List[QAPair], json_obj))
             elif isinstance(json_obj, dict):
-                results.append(json_obj)
+                # Cast single dictionary to QAPair type
+                results.append(cast(QAPair, json_obj))
         except json.JSONDecodeError:
             logger.error(f"Failed to parse JSON: {json_str}")
     return results
@@ -52,8 +63,8 @@ def generate_questions_answers(
     text_chunk: str,
     llm: ChatModel,
     cost_analyzer: CostAnalyzer,
-    rate_limiter: RateLimiter = None,
-) -> List[dict]:
+    rate_limiter: Optional[RateLimiter] = None,
+) -> List[QAPair]:
     # Input Token Count
     prompt_text_for_count = QA_GENERATION_TEMPLATE.format(text=text_chunk)
     input_tokens = cost_analyzer.count_tokens(prompt_text_for_count)
@@ -80,7 +91,7 @@ def generate_questions_answers(
         f"Chunk processing cost: ${total_cost:.6f} (Input: ${input_cost:.6f}, Output: ${output_cost:.6f})"
     )
 
-    result = extract_json_from_response(response)
+    result: List[QAPair] = extract_json_from_response(response)
     if result:
         logger.info(f"Generated {len(result)} Q&A pairs from this chunk")
         return result
@@ -93,23 +104,23 @@ def process_text(
     text: str,
     llm: ChatModel,
     cost_analyzer: CostAnalyzer,
-    rate_limiter: RateLimiter = None,
-) -> List[dict]:
+    rate_limiter: Optional[RateLimiter] = None,
+) -> List[QAPair]:
     logger.debug(f"Processing text of length {len(text)}")
     responses = generate_questions_answers(text, llm, cost_analyzer, rate_limiter)
     logger.info(f"Generated {len(responses)} Q&A pairs")
     return responses
 
 
-def format_alpaca_dataset(qa_pairs: List[dict]) -> List[dict]:
-    formatted_data = []
+def format_alpaca_dataset(qa_pairs: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    formatted_data: List[Dict[str, str]] = []
     for i, qa in enumerate(qa_pairs):
         try:
             formatted_data.append(
                 {
-                    "instruction": qa.get("instruction", ""),
-                    "input": qa.get("input", ""),
-                    "output": qa.get("output", ""),
+                    "instruction": str(qa.get("instruction", "")),
+                    "input": str(qa.get("input", "")),
+                    "output": str(qa.get("output", "")),
                 }
             )
         except Exception as e:
