@@ -1,13 +1,36 @@
 import json
 import logging
+import os
 import re
 from typing import List
-from langchain_community.llms import Ollama
 from langchain.schema import StrOutputParser
+from langchain_groq import ChatGroq
+from langchain_ollama import OllamaLLM
 from cost_analyzer import CostAnalyzer
+from project_types import ChatModel, CliArgs
 from prompt_templates import QA_GENERATION_TEMPLATE
+from rate_limiter import GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE, RateLimiter
 
 logger = logging.getLogger(__name__)
+
+
+def initialize_llm(args: CliArgs):
+    llm: ChatModel = None
+    if args.use_groq:
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        if not groq_api_key:
+            logger.error(
+                "❌ GROQ_API_KEY not found in environment variables. Please set it in your .env file."
+            )
+            return None, None
+        llm = ChatGroq(model_name=args.model, groq_api_key=groq_api_key)
+        rate_limiter = RateLimiter(GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE)
+        logger.info("🚀 Using Groq with rate limiting")
+    else:
+        llm = OllamaLLM(model=args.model)
+        rate_limiter = None
+        logger.info("🚀 Using Ollama")
+    return llm, rate_limiter
 
 
 def extract_json_from_response(response: str) -> List[dict]:
@@ -26,14 +49,21 @@ def extract_json_from_response(response: str) -> List[dict]:
 
 
 def generate_questions_answers(
-    text_chunk: str, llm: Ollama, cost_analyzer: CostAnalyzer
+    text_chunk: str,
+    llm: ChatModel,
+    cost_analyzer: CostAnalyzer,
+    rate_limiter: RateLimiter = None,
 ) -> List[dict]:
-    chain = QA_GENERATION_TEMPLATE | llm | StrOutputParser()
-    prompt_text = QA_GENERATION_TEMPLATE.format(text=text_chunk)
-    input_tokens = cost_analyzer.count_tokens(prompt_text)
-    logger.debug(f"Sending chunk of {len(text_chunk)} characters to Ollama")
+    # Input Token Count
+    prompt_text_for_count = QA_GENERATION_TEMPLATE.format(text=text_chunk)
+    input_tokens = cost_analyzer.count_tokens(prompt_text_for_count)
+
+    if rate_limiter:
+        rate_limiter.wait(input_tokens)
 
     try:
+        logger.debug(f"Sending chunk of {len(text_chunk)} characters to Ollama")
+        chain = QA_GENERATION_TEMPLATE | llm | StrOutputParser()
         response = chain.invoke({"text": text_chunk})
         logger.debug(f"Received response of {len(response)} characters from Ollama")
         logger.debug(f"Raw LLM response: {response}")
@@ -41,7 +71,9 @@ def generate_questions_answers(
         logger.error(f"Error generating Q&A pairs: {str(e)}")
         return []
 
+    # Output Token Count
     output_tokens = cost_analyzer.count_tokens(response)
+    # Token Cost Analysis
     input_cost, output_cost = cost_analyzer.add_usage(input_tokens, output_tokens)
     total_cost = input_cost + output_cost
     logger.info(
@@ -58,10 +90,13 @@ def generate_questions_answers(
 
 
 def process_text(
-    text: str, llm: Ollama, cost_analyzer: CostAnalyzer, chunk_size: int = 2000
+    text: str,
+    llm: ChatModel,
+    cost_analyzer: CostAnalyzer,
+    rate_limiter: RateLimiter = None,
 ) -> List[dict]:
     logger.debug(f"Processing text of length {len(text)}")
-    responses = generate_questions_answers(text, llm, cost_analyzer)
+    responses = generate_questions_answers(text, llm, cost_analyzer, rate_limiter)
     logger.info(f"Generated {len(responses)} Q&A pairs")
     return responses
 
