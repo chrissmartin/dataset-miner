@@ -1,96 +1,169 @@
 # Dataset Miner
 
-Dataset Miner is a powerful tool designed to generate question-answer (Q&A) pairs from various file types using AI models. It processes documents such as PDFs, text files, Word documents, JSON, CSV, and Excel files to create a dataset suitable for fine-tuning language models or other NLP tasks.
+Dataset Miner is a powerful Python tool designed to generate high-quality question-answer (Q&A) pairs from various document formats using AI models. It processes documents such as PDFs, text files, Word documents, programming code files, JSON, CSV, and Excel files to create datasets suitable for fine-tuning language models or other NLP tasks.
 
-## Features
+## 🌟 Features
 
-- Supports multiple file formats: PDF, TXT, DOCX, JSON, CSV, XLSX, XLS
-- Uses Ollama AI models for Q&A pair generation
-- Processes files in chunks to handle large documents efficiently
-- Provides cost analysis for token usage
-- Outputs data in Alpaca dataset format
-- Includes logging for easy debugging and progress tracking
+- **Multiple Format Support**:
+  - Documents: PDF, TXT, DOCX
+  - Data Files: JSON, CSV, XLSX, XLS
+  - Code Files: Python, Java, JavaScript, TypeScript, C++, and many more
+- **Advanced Processing**:
+  - Smart text chunking with support for code-aware splitting
+  - Intelligent header detection for markdown and HTML files
+  - Robust encoding handling for various file formats
+  - Support for table extraction from Word documents
+- **AI Integration**:
+  - Compatible with both Ollama and Groq AI models
+  - Customizable prompt templates for Q&A generation
+  - Optional verification of generated Q&A pairs
+- **Performance & Control**:
+  - Rate limiting for API calls
+  - Token usage tracking and cost analysis
+  - Progress tracking with detailed logging
+  - Support for processing large documents efficiently
 
-## Requirements
+## 📋 Requirements
 
-- Python 3.6+
-- Dependencies listed in `requirements.txt`
+- Python 3.8 or higher
+- Dependencies (automatically installed):
+  - langchain & langchain-community
+  - langchain-groq (for Groq integration)
+  - langchain-ollama (for Ollama integration)
+  - PyPDF2 (PDF processing)
+  - python-docx (Word document processing)
+  - pandas & openpyxl (Excel/CSV processing)
+  - tiktoken (token counting)
+  - Additional utilities: tqdm, colorama, python-dotenv
 
-## Installation
+## 💻 Installation
 
-1. Clone this repository:
+1. Install from PyPI:
 
+   ```bash
+   pip install dataset-miner
    ```
-   git clone https://github.com/your-username/dataset-miner.git
+
+2. Or install from source:
+   ```bash
+   git clone https://github.com/chrissmartin/dataset-miner.git
    cd dataset-miner
+   pip install -e .
    ```
 
-2. Install the required dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+## 🚀 Usage
 
-## Usage
+### Command Line Interface
 
-Run the main script with the following command:
-
-```
-python main.py -source <input_directory> -model <ollama_model_id> [--output <output_file>] [--debug]
+```bash
+dataset-miner -source <input_directory> -model <ai_model_name> [options]
 ```
 
-Arguments:
+Required arguments:
 
-- `-source`: Directory containing files to mine (required)
-- `-model`: Ollama AI model ID/slug to use for mining (required)
-- `--output`: Output JSON file for the mined dataset (default: mined_dataset.json)
+- `-source`: Directory containing files to process
+- `-model`: AI model identifier (e.g., "gpt-4o-mini" for Ollama)
+
+Optional arguments:
+
+- `--output`: Output JSON file path (default: mined_dataset.json)
+- `--use-groq`: Use Groq instead of Ollama
+- `--verify`: Enable verification of generated Q&A pairs
 - `--debug`: Enable debug logging
+- `--remove-empty-columns`: Remove empty columns from CSV/Excel files
 
-Example:
+### Python API
 
+```python
+from dataset_miner import mine_documents
+
+# Basic usage
+mined_data, output_path = mine_documents(
+    source_dir="./documents",
+    model="gpt-4o-mini",
+    output_file="dataset.json"
+)
+
+# Advanced usage with all options
+mined_data, output_path = mine_documents(
+    source_dir="./documents",
+    model="gpt-4o-mini",
+    output_file="dataset.json",
+    use_groq=True,
+    remove_empty_columns=True,
+    verify=True,
+    debug=True
+)
 ```
-python main.py -source ./documents -model gpt-4o-mini --output mined_data.json
-```
 
-## Project Structure
-
-- `main.py`: Entry point of the application
-- `data_extractor.py`: Contains functions to extract text from various file formats
-- `llm_utils.py`: Utility functions for interacting with the AI model and processing text
-- `cost_analyzer.py`: Tracks token usage and estimates costs
-- `prompt_templates.py`: Defines prompt templates for the AI model
-- `requirements.txt`: Lists all required Python packages
-
-## Output
+## 📤 Output Format
 
 The tool generates a JSON file containing Q&A pairs in the Alpaca dataset format:
 
 ```json
 [
   {
-    "instruction": "Question goes here",
-    "input": "Any relevant input (if applicable)",
-    "output": "Answer goes here"
-  },
-  ...
+    "instruction": "Question text here",
+    "input": "Additional context (if any)",
+    "output": "Answer text here"
+  }
 ]
 ```
 
-## Cost Analysis
+When verification is enabled, each entry includes additional verification metadata:
 
-The tool provides a summary of token usage and estimated costs based on the specified model's pricing. This information is logged at the end of the mining process.
+```json
+[
+  {
+    "instruction": "Question text here",
+    "input": "Additional context (if any)",
+    "output": "Answer text here",
+    "verification": {
+      "status": "CORRECT",
+      "explanation": "Verification details"
+    }
+  }
+]
+```
 
-## Logging
+## 📊 Cost Analysis
 
-Detailed logs are written to the console, including progress updates, token usage, and any errors encountered during the mining process. Use the `--debug` flag for more verbose logging.
+The tool provides detailed cost analysis and usage statistics:
 
-## Contributing
+- Token usage tracking (input/output)
+- Cost breakdown by operation type
+- Verification costs (if enabled)
+- Average cost per Q&A pair
+- Total cost summary
 
-Contributions to the Dataset Miner project are welcome! Please feel free to submit pull requests or open issues to suggest improvements or report bugs.
+## 🔍 Logging
 
-## License
+The tool provides comprehensive logging with different verbosity levels:
 
-[Specify your chosen license here]
+- Basic progress updates
+- Token usage and cost tracking
+- Error reporting and debugging information
+- Color-coded console output for better visibility
 
-## Disclaimer
+Enable debug logging with the `--debug` flag for more detailed information.
 
-This tool uses AI models to generate content. While it strives for accuracy, the generated Q&A pairs should be reviewed for quality and appropriateness before use in production systems or datasets.
+## 🔐 Environment Variables
+
+- `GROQ_API_KEY`: Required when using Groq integration (set in .env file)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit pull requests or open issues for:
+
+- Bug fixes
+- Feature enhancements
+- Documentation improvements
+- Test coverage expansion
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## ⚠️ Disclaimer
+
+While Dataset Miner strives for accuracy in Q&A pair generation, the output should be reviewed for quality and appropriateness before use in production systems or datasets. The generated content depends on the AI model used and may require manual verification for critical applications.
