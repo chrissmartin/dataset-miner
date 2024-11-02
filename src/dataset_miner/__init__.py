@@ -23,7 +23,7 @@ try:
 except PackageNotFoundError:  # pragma: no cover
     # Package is not installed
     try:
-        from dataset_miner._version import version as __version__  # type: ignore
+        from dataset_miner._version import version as __version__
     except ImportError:
         __version__ = "unknown"
 

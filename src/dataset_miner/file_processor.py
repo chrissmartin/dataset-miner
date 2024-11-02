@@ -79,6 +79,10 @@ def get_appropriate_splitter(file_path: str, chunk_size: int, chunk_overlap: int
                 ("h4", "Header 4"),
                 ("h5", "Header 5"),
                 ("h6", "Header 6"),
+                ("article", "Article"),
+                ("section", "Section"),
+                ("main", "Main Content"),
+                ("nav", "Navigation"),
             ],
         )
     elif file_extension == ".md":

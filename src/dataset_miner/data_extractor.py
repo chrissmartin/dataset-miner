@@ -30,7 +30,8 @@ def extract_text_from_pdf(file_path: str) -> str:
             for i, page in enumerate(pdf_reader.pages, 1):
                 try:
                     page_text = page.extract_text()
-                    text += page_text + "\n\n"
+                    if page_text:
+                        text += page_text + "\n\n"
                     logger.debug(f"Processed page {i}/{total_pages}")
                 except Exception as e:
                     logger.warning(f"Failed to extract text from page {i}: {str(e)}")
@@ -38,7 +39,7 @@ def extract_text_from_pdf(file_path: str) -> str:
             logger.info(f"Extracted {len(text)} characters from {file_path}")
             return text.strip()
     except Exception as e:
-        raise TextExtractionError(f"Failed to extract text from PDF: {str(e)}")
+        raise TextExtractionError(f"Failed to extract text from PDF: {str(e)}") from e
 
 
 def extract_text_from_txt(file_path: str, encoding: str = "utf-8") -> str:
@@ -93,7 +94,7 @@ def extract_text_from_docx(file_path: str) -> str:
         logger.info(f"Extracted {len(text)} characters from {file_path}")
         return text
     except Exception as e:
-        raise TextExtractionError(f"Failed to extract text from DOCX: {str(e)}")
+        raise TextExtractionError(f"Failed to extract text from DOCX: {str(e)}") from e
 
 
 def extract_text_from_json(file_path: str) -> str:
@@ -106,7 +107,7 @@ def extract_text_from_json(file_path: str) -> str:
         logger.info(f"Extracted {len(text)} characters from {file_path}")
         return text
     except Exception as e:
-        raise TextExtractionError(f"Failed to extract text from JSON: {str(e)}")
+        raise TextExtractionError(f"Failed to extract text from JSON: {str(e)}") from e
 
 
 def extract_text_from_csv(file_path: str) -> str:
@@ -132,7 +133,7 @@ def extract_text_from_csv(file_path: str) -> str:
         logger.info(f"Extracted {len(text)} characters from {file_path}")
         return text
     except Exception as e:
-        raise TextExtractionError(f"Failed to extract text from CSV: {str(e)}")
+        raise TextExtractionError(f"Failed to extract text from CSV: {str(e)}") from e
 
 
 def extract_text_from_xlsx(file_path: str) -> str:
@@ -151,7 +152,7 @@ def extract_text_from_xlsx(file_path: str) -> str:
         logger.info(f"Extracted {len(text)} characters from {file_path}")
         return text
     except Exception as e:
-        raise TextExtractionError(f"Failed to extract text from Excel: {str(e)}")
+        raise TextExtractionError(f"Failed to extract text from Excel: {str(e)}") from e
 
 
 def extract_text_from_code(file_path: str) -> str:
@@ -167,7 +168,7 @@ def extract_text_from_code(file_path: str) -> str:
         except Exception as e:
             raise TextExtractionError(
                 f"Failed to extract text from code file: {str(e)}"
-            )
+            ) from e
 
 
 # Mapping of file extensions to their extraction functions
