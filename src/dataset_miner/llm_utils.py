@@ -23,13 +23,15 @@ logger = logging.getLogger(__name__)
 def initialize_llm(args: CliArgs):
     llm: Optional[ChatModel] = None
     if args.use_groq:
-        groq_api_key: Optional[SecretStr] = SecretStr(os.getenv("GROQ_API_KEY")) if os.getenv("GROQ_API_KEY") else None
-        if not groq_api_key:
+        groq_api_key_value = os.getenv("GROQ_API_KEY")
+        if groq_api_key_value is not None:
+            groq_api_key = SecretStr(groq_api_key_value)
+        else:
             logger.error(
                 "❌ GROQ_API_KEY not found in environment variables. Please set it in your .env file."
             )
             return None, None
-        llm = ChatGroq(model=args.model, api_key=groq_api_key)
+        llm = ChatGroq(model=args.model, api_key=groq_api_key, stop_sequences=None)
         rate_limiter = RateLimiter(GROQ_REQUESTS_PER_MINUTE, GROQ_TOKENS_PER_MINUTE)
         logger.info("🚀 Using Groq with rate limiting")
     else:

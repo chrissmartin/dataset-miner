@@ -58,7 +58,7 @@ def parse_arguments() -> CliArgs:
     )
 
 
-def main():
+def main() -> None:
     """Main entry point for the dataset-miner CLI."""
     print(f"Dataset Miner version: {__version__}")
     init(autoreset=True)
